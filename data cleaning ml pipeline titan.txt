@@ -1,0 +1,77 @@
+Practical 6
+import numpy as np
+import pandas as pd
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import accuracy_score,classification_report
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
+
+df_train = pd.read_csv('/home/sumon/Documents/Datasets/titan_train.csv')
+df_test = pd.read_csv('/home/sumon/Documents/Datasets/titan_test.csv')
+
+df_train.head()
+
+df_test.head()
+
+df_train.info()
+
+df_test.info()
+
+df_train.isna().sum()
+
+df_test.isna().sum()
+
+def cleaning_data(df):
+    m=np.mean(df['Age'])
+    df['Age'].fillna(m,inplace=True)
+    df['Embarked'].fillna('S',inplace=True)
+    df.drop(['Ticket','Name','Cabin','PassengerId'],axis=1,inplace=True)
+    m_fare = np.median(df[df['Fare'].isna()==False]['Fare'])
+    df['Fare'].fillna(m_fare,inplace=True)
+    return df
+
+def encoding_data(df):
+    df = pd.get_dummies(data=df,columns=['Sex','Embarked'])
+    return df
+
+df_cleaned_tr = cleaning_data(df_train)
+
+df_cleaned_test = cleaning_data(df_test)
+
+df_encode_tr = encoding_data(df_cleaned_tr)
+df_encode_test = encoding_data(df_cleaned_test)
+
+logit_p1 = Pipeline([('scaling',StandardScaler()),
+                     ('pca',PCA(n_components=3)),
+                     ('model_logit',LogisticRegression())])
+
+dtree_p1 = Pipeline([('scaling',StandardScaler()),
+                     ('pca',PCA(n_components=3)),
+                     ('model_dtree',DecisionTreeClassifier())])
+
+naive_p1 = Pipeline([('scaling',StandardScaler()),
+                     ('pca',PCA(n_components=3)),
+                     ('model_bayes',GaussianNB())])
+
+x = df_encode_tr.drop('Survived',axis=1)
+
+y = df_encode_tr['Survived']
+
+x_tr,x_test,y_tr,y_test = train_test_split(x,y,test_size=0.2,random_state=100)
+
+my_pipeline = [logit_p1,dtree_p1,naive_p1]
+
+pipeline_dict = {0:'Logistic_Regression',1:'Decision_Tree',2:'Naive_Bayes'}
+
+for i in my_pipeline:
+    i.fit(x_tr,y_tr)
+
+for i,model in enumerate(my_pipeline):
+    print(f"{pipeline_dict[i]}'s training accuracy is : {model.score(x_tr,y_tr)}")
+
+for i,model in enumerate(my_pipeline):
+    print(f"{pipeline_dict[i]}'s testing accuracy is : {model.score(x_test,y_test)}")

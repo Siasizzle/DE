@@ -1,0 +1,52 @@
+Practical 5
+rdd_iris1 = sc.textFile("/FileStore/tables/Iris-1.csv",4)
+rdd_iris1.collect()
+
+rdd_iris1.getNumPartitions()
+
+rdd_iris1.glom().collect()[0]
+
+len(rdd_iris1.glom().collect()[0])
+
+rdd_iris1.glom().collect()[1]
+
+len(rdd_iris1.glom().collect()[1])
+
+len(rdd_iris1.glom().collect()[2])
+
+len(rdd_iris1.glom().collect()[3])
+
+rdd_iris2 = sc.parallelize(rdd_iris1.collect(),8)
+rdd_iris2.getNumPartitions()
+
+for i in rdd_iris1.collect():print(i)
+
+rdd_iris3=rdd_iris2.map(lambda x:x*2)
+rdd_iris2.collect()
+
+rdd_iris3.collect()
+
+rdd_iris4 = rdd_iris2.flatMap(lambda x:x.split(","))
+rdd_iris4.collect()
+
+rdd_iris4.getNumPartitions()
+
+rdd_iris4.glom().collect()[0]
+
+rdd_iris4.glom().collect()[1]
+
+rdd_iris5 = rdd_iris4.map(lambda x:x*2)
+rdd_iris5.collect()
+
+## Filtering
+rdd_iris6 = rdd_iris1.flatMap(lambda x:x.split(",")).filter(lambda x:x=="Iris virginica").map(lambda x:(x,1))
+
+rdd_iris6.glom().collect()[1]
+
+rdd_species = rdd_iris1.flatMap(lambda x:x.split(",")).filter(lambda x:(x=="Iris-virginica" or x=="Iris-setosa" or x=="Iris-versicolor"))
+
+rdd_species.collect()
+
+rdd_species1 = rdd_species.groupBy(lambda x:x).mapValues(lambda x:len(x))
+
+rdd_species1.collect()

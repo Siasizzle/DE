@@ -1,0 +1,64 @@
+Practical 7
+from pyspark.ml import Pipeline
+from pyspark.ml.feature import StringIndexer,OneHotEncoder,VectorAssembler
+
+df_ipl = spark.read.option("inferSchema",True).option("header",True).csv("/FileStore/tables/ind_ban_comment.csv")
+df_ipl.show()
+
+df_ipl.printSchema()
+
+df_ipl_mod = StringIndexer(inputCol="Batsman_Name",outputCol="bt_idx").fit(df_ipl).transform(df_ipl)
+
+df_ipl_mod.select("Batsman_name","bt_idx").show()
+
+df_ipl.columns
+
+df_ipl = df_ipl.drop(*["Batsman","Bowler","Id"])
+
+stage2 = StringIndexer(inputCol='Batsman_Name',outputCol='bm_index')
+stage3 = StringIndexer(inputCol='Bowler_Name',outputCol='bowler_index')
+stage4 = StringIndexer(inputCols=['bm_index','bowler_index'],outputCols=['bm_ohe','bowler_ohe'])
+
+stage5 = VectorAssembler(inputCols=['Dismissed','Isball','Isboundary','Over','Runs','bm_ohe','bowler_ohe'],outputCol="features")
+
+from pyspark.ml.classification import LogisticRegression
+stage6 = LogisticRegression(featuresCol="features",labelCol="Iswicket")
+
+pl = Pipeline(stages=[stage2,stage3,stage4,stage5,stage6])
+
+df_ipl = df_ipl.fillna(0)
+
+logit_model = pl.fit(df_ipl).transform(df_ipl)
+
+logit_model.select("features","Iswicket","prediction").show()
+
+logit_model.columns
+
+pl1 = Pipeline(stages=[stage2,stage3,stage4])
+
+df_mod = pl1.fit(df_ipl).transform(df_ipl)
+
+df_mod.show()
+
+df_vec = VectorAssembler(inputCols=['Dismissed','Isball','Isboundary','Over','Runs','bm_ohe','bowler_ohe'],outputCol="features").transform(df_mod)
+
+df_vector = df_vec.select("features","Iswicket")
+
+splits = df_vector.randomSplit([.7,.3])
+
+df_train = splits[0]
+df_test = splits[1]
+
+df_train.show(10)
+
+logit_mod_tr = LogisticRegression(featuresCol="features",labelCol="Iswicket").fit(df_train).transform(df_train)
+
+logit_mod_test = LogisticRegression(featuresCol="features",labelCol="Iswicket").fit(df_train).transform(df_test)
+
+logit_mod_test.select(["features","Iswicket","prediction"]).show()
+
+from pyspark.ml.evaluation import BinaryClassificationEvaluator
+
+eval = BinaryClassificationEvaluator(labelCol="Iswicket",rawPredictionCol="prediction",metricName="areaUnderROC")
+
+eval.evaluate(logit_mod_test)

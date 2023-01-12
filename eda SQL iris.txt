@@ -1,0 +1,61 @@
+Practical 4
+#load csv file
+df_iris = spark.read.format("csv").option("multiline", True).option("header",
+True).option("inferschema", True).load("/FileStore/tables/Iris-1.csv")
+df_iris.show()
+
+df_iris.printSchema()
+
+df_iris.count()
+
+#to print the summary of the columns
+df_iris.summary().show()
+
+#select specific columns
+df_iris.select("SepalLengthCm","PetalLengthCm").show()
+
+df_iris.createOrReplaceTempView("irisTab")
+
+df_iris1 = spark.sql("select * from irisTab where PetalLengthCm<2.5")
+df_iris1.show()
+
+df_iris1.count()
+
+df_iris2 = spark.sql("select * from irisTab where PetalLengthCm between 2.5 and 4.5")
+df_iris2.show()
+
+df_iris2.count()
+
+#spark query to see the count of each species
+df_iris.groupby("species").count().show()
+
+df_iris1=spark.sql("Select species, count(*) from iristab group by species")
+df_iris1.show()
+
+#get the sepal length and sepal width of the species iris-setosa
+df_iris2=spark.sql("select SepalLengthCm, SepalWidthCm,species from irisTab where species=\"Iris-setosa\"")
+df_iris2.show()
+
+df_iris2 = spark.sql("select species, min(SepalLengthCm) as min_sepal_length from irisTab group by species")
+df_iris2.show()
+
+#find out the average petal length of each species in the iris dataset
+df_iris.groupby("species").mean("PetalLengthCm").show()
+
+#to run multiple aggregates using spark
+spark.sql("select species,min(PetalLengthCm) as min_petal_len,max(PetalLengthCm) as max_petal_len,avg(PetalLengthCm) as avg_petal_len from irisTab group by species").show()
+
+#print the petal length and petal width and species where the averagepetal length is more than 4 
+spark.sql("select species,PetalLengthCm,PetalWidthCm from irisTab group by species,PetalLengthCm,PetalWidthCm having mean(PetalLengthCm)>4.0").show()
+
+#to print the data using a spark command where species iris setosa
+df_iris.where("species==\"Iris-setosa\"").show()
+
+df_iris2 = df_iris.withColumnRenamed("PetalLengthCm","petal_len")
+df_iris2.show()
+
+#conver iris spark dataset to pandas
+pd_iris = df_iris.toPandas()
+pd_iris.head()
+
+pd_iris.dtypes

@@ -1,0 +1,134 @@
+Practical 10
+
+!pip install keras
+!pip install tensorflow
+!pip install elephas
+
+from pyspark.ml.feature import StandardScaler, VectorAssembler, StringIndexer, OneHotEncoder
+from pyspark.ml import Pipeline
+from pyspark.mllib.evaluation import MulticlassMetrics
+from keras.models import Sequential
+from keras.layers.core import Dense, Dropout, Activation
+from keras import optimizers, regularizers
+from keras.optimizers import Adam
+from elephas.ml_model import ElephasEstimator
+
+df = spark.read.option("inferSchema", True).option("header", True).csv("/FileStore/tables/bank_new.csv")
+df.show(10)
+
+df.printSchema()
+
+df1 = df.toPandas()
+
+dt = df1.dtypes
+numeric = dt[dt=='int32'].index
+categorical = dt[dt=='object'].index
+categorical
+
+cat_features = dt[dt=="object"].index
+cat_features
+
+num_features = dt[dt=="int32"].index
+num_features
+
+si = StringIndexer(inputCols = ['job', 'marital', 'education', 'default', 'housing', 'loan', 'contact', 'month', 'poutcome', 'deposit'], outputCols = ['job_idx', 'marital_idx', 'education_idx', 'default_idx', 'housing_idx', 'loan_idx', 'contact_idx', 'month_idx', 'poutcome_idx', 'label'])
+si
+
+df_si = si.fit(df)
+df_si = df_si.transform(df)
+
+df_si.columns
+
+ohe = OneHotEncoder(inputCols = ['job_idx', 'marital_idx', 'default_idx', 'housing_idx', 'loan_idx', 'contact_idx', 'month_idx', 'poutcome_idx'], outputCols = ['job_ohe', 'marital_ohe', 'default_ohe', 'housing_ohe', 'loan_ohe', 'contact_ohe', 'month_ohe', 'poutcome_ohe'])
+
+df_si = si.fit(df).transform(df)
+
+df_si.show()
+
+df_ohe = ohe.fit(df_si).transform(df_si)
+
+df_ohe.select("job_ohe", "marital_ohe").show()
+
+va = VectorAssembler(inputCols = ['age', 'balance', 'day', 'duration', 'campaign', 'pdays', 'previous', 'job_ohe', 'marital_ohe', 'default_ohe', 'housing_ohe', 'loan_ohe', 'contact_ohe', 'month_ohe', 'poutcome_ohe'], outputCol="features")
+
+df_new = va.transform(df_ohe)
+
+d1 = df_new.select("features").toPandas()
+d1.head()
+
+from pyspark.sql.functions import rand
+
+df_new = df_new.select("features", "label")
+df_new = df_new.orderBy(rand())
+df_new.show()
+
+df2 = df_new.toPandas()
+
+df2.head()
+
+df_new.select("features").show(5)
+
+df_tr, df_test = df_new.randomSplit([.8, .2])
+df_tr.show()
+
+n_classes = df_tr.select("label").distinct().count()
+n_classes
+
+input_dim = len(df_tr.select("features").first()[0])
+input_dim
+
+model = Sequential()
+model.add(Dense(64, input_shape=(input_dim,), activity_regularizer = regularizers.l2(0.01)))
+model.add(Activation('relu'))
+model.add(Dropout(rate=0.3))
+model.add(Dense(64, activity_regularizer=regularizers.l2(0.01)))
+model.add(Activation('relu'))
+model.add(Dropout(rate=0.3))
+model.add(Dense(n_classes))
+model.add(Activation('sigmoid'))
+model.compile(loss='binary_crossentropy', optimizer='adam')
+optimizer_conf = optimizers.Adam(learning_rate=0.01)
+opt_conf = optimizers.serialize(optimizer_conf)
+
+#Initialize SparkML Estimator and get Settings
+estimator = ElephasEstimator()
+estimator.setFeaturesCol("features")
+estimator.setLabelCol("label")
+estimator.set_keras_model_config(model.to_json())
+estimator.set_categorical_labels(True)
+estimator.set_nb_classes(n_classes)
+estimator.set_num_workers(1)
+estimator.set_epochs(25)
+estimator.set_batch_size(64)
+estimator.set_verbosity(1)
+estimator.set_validation_split(0.10)
+estimator.set_optimizer_config(opt_conf)
+estimator.set_mode("synchronous")
+estimator.set_loss("binary_crossentropy")
+estimator.set_metrics(['acc'])
+
+dl_pipeline = Pipeline(stages=[estimator])
+fit_pipeline = dl_pipeline.fit(df_new)
+
+df_new.printSchema()
+
+pred_train = fit_pipeline.transform(df_new)
+pred_train.show()
+
+pnl_train = pred_train.select("label", "prediction")
+pnl_train.printSchema()
+
+pnl_train.show()
+
+import numpy as np
+df = pnl_train.toPandas()
+li_pred = []
+for i in df["prediction"]:
+    li_pred.append(np.argmax(i))
+df["pred_new"] = li_pred
+df.head()
+
+from sklearn.metrics import confusion_matrix, accuracy_score
+print(confusion_matrix(df["label"], df["pred_new"]))
+
+accuracy_score(df["label"], df["pred_new"])

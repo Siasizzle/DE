@@ -1,0 +1,88 @@
+Practical 8
+import pyspark
+import pandas as pd
+from pyspark import SparkContext,SparkConf
+from pyspark.sql import SparkSession
+
+spark_new = SparkSession.builder.master("local[2]").getOrCreate()
+
+data = spark_new.read.option("header",True).option("inferSchema",True).csv("/FileStore/tables/USA_cars_datasets.csv")
+
+data.show()
+
+data.printSchema()
+
+df_panda=data.toPandas()
+
+df_panda.dtypes
+
+df_panda.columns
+
+df_panda.isna().sum()
+
+import seaborn as sns
+sns.heatmap(df_panda.corr(), annot=True)
+
+from pyspark.ml.feature import OneHotEncoder
+from pyspark.ml.feature import StringIndexer
+string_index=StringIndexer(inputCols=['brand','model','color','state'],outputCols=['brand_idx','model_idx','color_idx','state_idx'])
+
+data = string_index.fit(data).transform(data)
+
+data.show()
+
+ohe_mod=OneHotEncoder(inputCols=['brand_idx','model_idx','color_idx','state_idx'],outputCols=['brand_ohe','model_ohe','color_ohe','state_ohe'])
+data = ohe_mod.fit(data).transform(data)
+
+from pyspark.ml.feature import VectorAssembler
+
+v1 = VectorAssembler(inputCols=['brand_ohe','color_ohe','state_ohe','year', 'mileage', 'lot'], outputCol="feature_vector")
+
+data_new = v1.transform(data)
+
+data_new.show()
+
+data_new.select("feature_vector").show()
+
+from pyspark.ml.regression import RandomForestRegressor
+
+rf_mod = RandomForestRegressor(featuresCol="feature_vector",labelCol="price")
+
+#cross_validation tuning
+from pyspark.ml.tuning import ParamGridBuilder
+pm=ParamGridBuilder().addGrid(rf_mod.numTrees,[100,1500]).build()
+
+from pyspark.ml.tuning import CrossValidator
+from pyspark.ml.evaluation import RegressionEvaluator
+cf = CrossValidator(estimator = rf_mod,
+                   estimatorParamMaps = pm,
+                   evaluator = RegressionEvaluator(labelCol = "price"),
+                   numFolds = 3)
+
+#splitting of the data into train and test set
+tr_data,test_data = data_new.randomSplit([.75,.25],seed=100)
+
+data_new.show()
+
+cvmod = cf.fit(tr_data)
+
+bestModel = cvmod.bestModel
+
+bestModel
+
+pred=cvmod.transform(test_data)
+
+pred.show()
+
+pred_mod = pred.select("price","prediction")
+
+pred_mod.show()
+
+pred = pred.withColumnRenamed("price","label")
+pred.show()
+
+from pyspark.ml.evaluation import RegressionEvaluator
+evaluator = RegressionEvaluator()
+eval_score = evaluator.evaluate(pred,{evaluator.metricName:'r2'})
+
+eval_score

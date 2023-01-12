@@ -1,0 +1,64 @@
+Practical 9
+import pyspark
+from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.evaluation import ClusteringEvaluator
+import pandas as pd
+import seaborn as sns
+
+uberdf_1 = spark.read.option("header",True).option("inferSchema",True).csv("/FileStore/tables/uber_data.csv")
+uberdf_1.show()
+
+from pyspark.sql.functions import *
+uberdf_1.printSchema()
+
+spark.sql("set spark.sql.legacy.timeParserPolicy=LEGACY")
+uberdf_2 = uberdf_1.withColumn("date_new", to_date(col("Date/Time"), "MM/dd/yyyy HH:mm:ss"))
+uberdf_2.show()
+
+from pyspark.sql.functions import month,dayofweek,year
+uberdf_3 = uberdf_2.withColumn("year", year(col("date_new")))
+uberdf_3.show()
+
+uberdf_3.printSchema()
+
+input_features = ["Lat","Lon"]
+va = VectorAssembler(inputCols=input_features,outputCol="features")
+uberdf_3 = va.transform(uberdf_3)
+uberdf_3.show()
+
+df = uberdf_2.toPandas()
+df.drop(["Base","Date/Time","date_new"], axis=1, inplace=True)
+df
+
+df.head(20)
+
+from sklearn.cluster import KMeans
+wcss=[]
+for k in range(1,11):
+    kmod=KMeans(n_clusters=k, init="random").fit(df)
+    wcss.append(kmod.inertia_)
+
+import matplotlib.pyplot as plt
+plt.plot(range(1,11), wcss, marker="o", c="blue", markerfacecolor="red")
+
+training, testing = uberdf_3.randomSplit([.75,.25])
+
+training.show()
+
+from pyspark.ml.clustering import KMeans
+kmod = KMeans(k=3, initMode="k-means||", featuresCol="features", predictionCol="prediction")
+kmod = kmod.fit(training)
+
+p = kmod.transform(testing)
+p.show()
+
+pl = p.toPandas()
+
+pl["prediction"].value_counts()
+
+pl.shape
+
+p.createOrReplaceTempView("uber")
+
+df=spark.sql("select prediction, count(*) from uber group by prediction")
+df.show()
