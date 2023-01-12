@@ -1,0 +1,90 @@
+use restaurant;
+
+ db.createCollection("pizza_rollno");
+
+db.pizza_rollno.insertMany( [
+{ _id: 0,name: "Pepperoni", size: "small", price: 19,quantity: 10, date:ISODate(
+"2021-03-13T08:14:30Z" ) },
+{ _id: 1,name: "Pepperoni", size: "medium", price: 20,quantity: 20,date : ISODate(
+"2021-03-13T09:13:24Z" ) },
+{ _id: 2,name: "Pepperoni", size: "large", price: 21,quantity: 30,date : ISODate(
+"2021-03-17T09:22:12Z" ) },
+{ _id: 3,name: "Cheese", size: "small", price: 12,quantity: 15,date : ISODate(
+"2021-03-13T11:21:39.736Z" ) },
+{ _id: 4,name: "Cheese", size: "medium", price: 13,quantity:50, date : ISODate(
+"2022-01-12T21:23:13.331Z") },
+{ _id: 5,name: "Cheese", size: "large", price: 14,quantity: 10,date : ISODate(
+"2022-01-12T05:08:13Z" ) },
+{ _id: 6,name: "Vegan", size: "small", price: 17,quantity: 10,date : ISODate(
+"2021-01-13T05:08:13Z" ) },
+{ _id: 7,name: "Vegan", size: "medium", price: 18,quantity: 10, date : ISODate(
+"2021-01-13T05:10:13Z" ) }
+] );
+
+ db.pizza_rollno.find({});
+
+db.pizza_rollno.find({"size":"small"},{});
+
+db.pizza_rollno.find({},{"_id":0,"name":1,"size":1,"price":1});
+
+db.pizza_rollno.find({"price":{$lt:20}});
+
+db.pizza_rollno.find({"name":{"$eq":"Cheese"}},{"_id":0,"name":1,"size":1});
+
+var map = function(){emit(this.name,this.quantity)};
+var reduce = function(n,q){return Array.sum(q)};
+db.pizza_rollno.mapReduce(map,reduce,{out:"total_quantity"});
+db.total_quantity.find({});
+
+var map = function(){emit(this.name,1)};
+var reduce = function(n,c){return Array.sum(c)};
+db.pizza_rollno.mapReduce(map,reduce,{out:"count_pizza"});
+db.count_pizza.find({});
+
+var map = function(){emit(this.name,2*this.price)};
+var reduce = function(n,p){return Array.sum(p)};
+db.pizza_rollno.mapReduce(map,reduce,{out:"double_price"});
+db.double_price.find({});
+
+ db.pizza_rollno.find({$and:[{"price":{$gte:20}},{"price":{$lte:40}}]});
+
+db.pizza_rollno.aggregate({$group:{_id:"$name",total_qty:{$sum:"$quantity"}}});
+
+db.pizza_rollno.aggregate([{$match:{"name":"Pepperoni"}},{$project:{"_id":0,"name":1,"p
+rice":1}}]);
+
+ db.pizza_rollno.aggregate([{$sort:{"price":-1}}]);
+
+db.pizza_rollno.aggregate([{$match:
+{"date":{$gte:new ISODate("2021-01-01"),$lte:ISODate("2021-03-01")}}},
+{$group:{_id:
+{$dateToString:{format:"%Y-%m-%d",date:"$date"}},"total_price":{$sum:"$price"}}}
+]);
+
+db.pizza_rollno.aggregate({$group:{_id:"$size","min_price":{$min:"$price"}}});
+
+db.pizza_rollno.aggregate([{$project:{"name":1,"quantity":1,
+"discount":
+{$cond:
+{if:{$gte:["$quantity",20]},
+then:5,else:2}
+}
+}}]);
+
+db.pizza_rollno.aggregate([{
+$project:{"name":1,"_id":0,"size":1,
+new_price:{$switch:{branches:[
+{case:{$eq:["$size","small"]},then:10},
+{case:{$eq:["$size","medium"]},then:20},
+{case:{$eq:["$size","large"]},then:30}
+]}}}}]);
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,81 @@
+URL: http://127.0.0.1:5984/_utils/
+
+curl -X PUT http://Minakshi:Verma@localhost:5984/employeetest
+
+curl http://Minakshi:Verma@localhost:5984/_all_dbs
+
+curl -X PUT http://localhost:5984/employee/1 -u TejalMhatre -d
+{\"Name\":\"Aisha\",\"Designation\":\"Nurse\",\"Salary\":160000,\"Location\":\"rk_puram\",\
+"City\":\"Delhi\"}
+
+Enter host password for user 'TejalMhatre':
+{"ok":true,"id":"1","rev":"1-04b9a510d317a7594c3cb94f34177e54"}
+
+C:\Users\PC>curl -X PUT http://localhost:5984/employee/2 -u TejalMhatre -d
+{\"Name\":\"Angelina\",\"Designation\":\"CEO\",\"Salary\":1000000,\"Location\":\"JM_road
+\",\"City\":\"Aundh_pune\"}
+
+Enter host password for user 'TejalMhatre':
+{"ok":true,"id":"2","rev":"1-469739fe4007cd620f3646e580f89957"}
+
+
+
+{
+"selector": {
+"City": "Delhi"
+}
+}
+
+
+{
+"selector": {
+"Salary": {
+"$gte": 200000,
+"$lte": 400000
+}
+},
+"fields": [
+"Name",
+"Designation",
+"Salary"
+]
+}
+
+
+{
+"selector": {
+"Name": "Celina",
+"City": "pune"
+}
+}
+
+
+{
+"selector": {
+"City": "Maharashtra"
+}
+}
+
+
+>curl -X GET http://localhost:5984/employee/10 -u TejalMhatre
+>curl -X PUT http://localhost:5984/employee/10 -u TejalMhatre -d
+{\"_id\":\"10\",\"_rev\":\"3-51e73b72cfac4489ab06d6f7fe42a6ea\",\"Name\":\"Glenny\",\"D
+esignation\":\"Administrator\",\"Salary\":200500,\"Location\":\"Nagpur\",\"City\":\"Nagpur\"
+}
+>curl -X GET http://localhost:5984/employee/10 -u TejalMhatre
+
+
+{
+"selector": {
+"Name": "Celina",
+"Designation": "Javascript_Developer"
+}
+}
+
+>curl -X GET http://localhost:5984/employee/6 -u TejalMhatre
+>curl -X DELETE
+http://localhost:5984/employee/6?rev=1-1c52a14e24120ff86b19270f7bcac3e1 -u
+TejalMhatre
+
+
+
