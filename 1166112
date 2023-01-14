@@ -1,0 +1,24 @@
+import tweepy
+import pandas as pd
+
+consumer_key = "9bygjXgLaDhXrz3KWpWGnbuC6"
+consumer_secret = "BTCYkGD01QUetVNz2o5lkur3VwTxRA2cK6cLrWOGeWL1pdA11a"
+access_token = "1407267771746906119-G1TxyS5L3EV30ZwNnDPIglAXCjts1q"
+access_token_secret = "WQicPCDJ8CbBDsJ0mI3xQVL9ZQt847wJLITGgcmMRF2ec"
+
+authorization = tweepy.OAuthHandler(consumer_key, consumer_secret)
+authorization.set_access_token(access_token, access_token_secret)
+
+api = tweepy.API(authorization,wait_on_rate_limit=True)
+
+search_word="#Independence"
+date_since='2020-05-28'
+
+tweets=tweepy.Cursor(api.search,q=search_word, lang="en",since=date_since).items(200)
+tweet_details=[[tweet.geo,tweet.text,tweet.user.screen_name,tweet.user.location]for tweet in tweets]
+
+tweet_details
+
+tweet_df = pd.DataFrame({"tweets":tweet_details})
+
+tweet_df.to_csv('tweet.csv')

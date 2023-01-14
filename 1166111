@@ -1,0 +1,124 @@
+!pip install pyLDAvis
+
+nltk.download('omw-1.4')
+
+import pandas as pd
+import re
+import numpy as np
+from sklearn.datasets import fetch_20newsgroups
+import nltk
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import stopwords
+
+from gensim import corpora, models
+from gensim.models.ldamulticore import LdaMulticore
+from gensim.models.coherencemodel import CoherenceModel
+import pyLDAvis.gensim
+
+import pyLDAvis.gensim_models as gensimvis
+pyLDAvis.enable_notebook()
+
+from nltk.corpus import stopwords
+stop_words = stopwords.words('english')
+stop_words.extend(['from', 'subject', 're', 'edu', 'use'])
+
+newsgroups_train = fetch_20newsgroups(subset='train')
+
+df = pd.DataFrame({'content': newsgroups_train['data'], 'target': newsgroups_train['target']})
+df['target_names'] = df['target'].apply(lambda t: newsgroups_train['target_names'][t])
+df.head()
+
+def remove_urls(text):
+    " removes urls"
+    url_pattern = re.compile(r'https?://\S+|www\.\S+')
+    return url_pattern.sub(r'', text)
+    
+def remove_html(text):
+    " removes html tags"
+    html_pattern = re.compile('')
+    return html_pattern.sub(r'', text)
+
+def remove_emails(text):
+    email_pattern = re.compile('\S*@\S*\s?')
+    return email_pattern.sub(r'', text)
+
+def remove_new_line(text):
+    return re.sub('\s+', ' ', text)
+
+def remove_non_alpha(text):
+    return re.sub("[^A-Za-z]+", ' ', str(text))
+
+def preprocess_text(text):
+    t = remove_urls(text)
+    t = remove_html(t)
+    t = remove_emails(t)
+    t = remove_new_line(t)
+    t = remove_non_alpha(t)
+    return t
+
+def lemmatize_words(text, lemmatizer):
+    return " ".join([lemmatizer.lemmatize(word) for word in text.split()])
+
+def remove_stopwords(text, stopwords):
+    return " ".join([word for word in str(text).split() if word not in stopwords])
+
+
+df['post_preprocessed'] = df['post'].apply(preprocess_text).str.lower()
+
+print('lemming...')
+nltk.download('wordnet')
+lemmatizer = WordNetLemmatizer()
+df['post_final'] = df['post_preprocessed'].apply(lambda post: lemmatize_words(post, lemmatizer))
+
+print('remove stopwors...')
+
+nltk.download('stopwords')
+swords = set(stopwords.words('english'))
+
+df['post_final'] = df['post_preprocessed'].apply(lambda post: remove_stopwords(post, swords))
+df.head()
+
+posts = [x.split(' ') for x in df['post_final']]
+id2word = corpora.Dictionary(posts)
+corpus_tf = [id2word.doc2bow(text) for text in posts]
+print(corpus_tf[0])
+
+tfidf = models.TfidfModel(corpus_tf)
+corpus_tfidf = tfidf[corpus_tf]
+print(corpus_tfidf[0])
+
+model = LdaMulticore(corpus=corpus_tf,id2word = id2word, num_topics = 20,
+                     alpha=.1, eta=0.1, random_state = 0)
+
+coherence = CoherenceModel(model = model, texts = posts, dictionary = id2word, coherence = 'u_mass')
+
+print(coherence.get_coherence())
+print(model.show_topics())
+
+import pyLDAvis.gensim_models as gensimvis
+pyLDAvis.enable_notebook()
+
+lda_display = gensimvis.prepare(model, corpus_tf, id2word, sort_topics = False)
+pyLDAvis.display(lda_display)
+
+data_dict = {'dominant_topic':[], 'perc_contribution':[], 'topic_keywords':[]}
+for i, row in enumerate(model[corpus_tf]):
+    #print(i)
+    row = sorted(row, key=lambda x: x[1], reverse=True)
+    #print(row)
+    for j, (topic_num, prop_topic) in enumerate(row):
+        wp = model.show_topic(topic_num)
+        topic_keywords = ", ".join([word for word, prop in wp])
+        data_dict['dominant_topic'].append(int(topic_num))
+        data_dict['perc_contribution'].append(round(prop_topic, 3))
+        data_dict['topic_keywords'].append(topic_keywords)
+        #print(topic_keywords)
+        break
+df_topics = pd.DataFrame(data_dict)
+contents = pd.Series(posts)
+df_topics['content'] = df['content']
+df_topics.head()
+
+
+
+
